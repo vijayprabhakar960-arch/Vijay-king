@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Satta App — Demo</title>
+<style>
+  body{font-family:Arial,Helvetica,sans-serif;background:#f3f6ff;margin:0;padding:18px}
+  .wrap{max-width:980px;margin:0 auto}
+  .card{background:#fff;padding:16px;border-radius:10px;box-shadow:0 8px 24px rgba(30,50,90,0.05);margin-bottom:14px}
+  input,select,button{padding:8px;border-radius:8px;border:1px solid #ddd;font-size:14px}
+  button{cursor:pointer;background:#1266f1;color:#fff;border:none}
+  .muted{color:#666;font-size:13px}
+  .admin{background:#fff8e6;border:1px solid #ffe0a3;padding:10px;border-radius:8px}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:8px;border-bottom:1px solid #eee;text-align:left}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="auth" class="card">
+    <h3>Signup</h3>
+    <input id="s_name" placeholder="Name"><br/><br/>
+    <input id="s_phone" placeholder="Phone"><br/><br/>
+    <input id="s_pass" placeholder="Password" type="password"><br/><br/>
+    <button id="btnSignup">Create account</button>
+    <div id="signupMsg" class="muted"></div>
+    <hr>
+    <h3>Login</h3>
+    <input id="l_phone" placeholder="Phone"><br/><br/>
+    <input id="l_pass" placeholder="Password" type="password"><br/><br/>
+    <button id="btnLogin">Login</button>
+    <div id="loginMsg" class="muted"></div>
+  </div>
+
+  <div id="app" style="display:none">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <h2 id="welcome">Welcome</h2>
+          <div class="muted" id="phoneSpan"></div>
+        </div>
+        <div style="text-align:right">
+          <div>Wallet: ₹<span id="wallet">0</span></div>
+          <button id="btnLogout" style="background:#f44336;margin-top:8px">Logout</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Add / Withdraw</h3>
+      <input id="txAmount" placeholder="Amount"><br/><br/>
+      <button id="btnAdd">Add Money</button>
+      <button id="btnWithdraw" style="background:#ff8a65">Withdraw</button>
+      <div id="txMsg" class="muted"></div>
+    </div>
+
+    <div class="card">
+      <h3>Place Bet</h3>
+      <label>Market</label><br/>
+      <select id="market">
+        <option value="">Select market</option>
+        <option>Sridevi</option>
+        <option>Time Bazar</option>
+        <option>Kalyan</option>
+        <option>Milan Day</option>
+      </select><br/><br/>
+      <input id="betNumber" placeholder="Number (e.g. 0, 1, 12)"><br/><br/>
+      <input id="betAmount" placeholder="Amount"><br/><br/>
+      <button id="btnPlace">Place Bet</button>
+      <div id="betMsg" class="muted"></div>
+    </div>
+
+    <div class="card">
+      <h3>History</h3>
+      <button id="btnRefresh">Refresh</button>
+      <h4>Wallet Transactions</h4>
+      <div id="walletList" class="muted"></div>
+      <h4>Bets</h4>
+      <div id="betsList" class="muted"></div>
+    </div>
+
+    <div id="adminPanel" class="card admin" style="display:none">
+      <h3>Admin Panel</h3>
+      <h4>Pending Bets</h4>
+      <div id="pendingBets"></div>
+
+      <h4>Create Result & Settle</h4>
+      <select id="resMarket">
+        <option value="">Select market</option>
+        <option>Sridevi</option>
+        <option>Time Bazar</option>
+        <option>Kalyan</option>
+        <option>Milan Day</option>
+      </select>
+      <input id="resNumber" placeholder="Winning number">
+      <button id="btnCreateRes">Create Result</button>
+      <button id="btnSettle">Settle Bets</button>
+      <div id="adminMsg" class="muted"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API_URL = "https://script.google.com/macros/s/AKfycbwqTofYvcHCNd1RZeQtr6qJULbfTAKHNLKy5iyDGqcAFKvmtgRS_a2SeKKdHU8-6UC2EQ/exec"; // <<--- REPLACE with your deployed /exec URL
+
+if(!API_URL || API_URL.includes('PASTE')) {
+  alert('Please set API_URL variable in index.html to your Apps Script /exec URL before using.');
+}
+
+// helper for POST (send JSON)
+async function callAPI(action, body){
+  body = body || {};
+  body.action = action;
+  const res = await fetch(API_URL, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  });
+  return await res.json();
+}
+
+function $(id){ return document.getElementById(id); }
+
+// Signup
+$('btnSignup').addEventListener('click', async ()=>{
+  const name = $('s_name').value.trim();
+  const phone = $('s_phone').value.trim();
+  const password = $('s_pass').value;
+  $('signupMsg').innerText = '';
+  if(!name || !phone || !password){ $('signupMsg').innerText = 'Fill all fields'; return; }
+  const r = await callAPI('signup',{name,phone,password});
+  if(r.success) $('signupMsg').innerText = 'Signup successful — please login.';
+  else $('signupMsg').innerText = 'Error: ' + (r.message || JSON.stringify(r));
+});
+
+// Login
+$('btnLogin').addEventListener('click', async ()=>{
+  const phone = $('l_phone').value.trim();
+  const password = $('l_pass').value;
+  $('loginMsg').innerText = '';
+  if(!phone || !password){ $('loginMsg').innerText = 'Fill login fields'; return; }
+  const r = await callAPI('login',{phone,password});
+  if(r.success){
+    localStorage.setItem('satta_session', JSON.stringify(r));
+    initApp(r.user);
+  } else {
+    $('loginMsg').innerText = 'Login failed: ' + (r.message || '');
+  }
+});
+
+function showAppUI(user){
+  $('auth').style.display = 'none';
+  $('app').style.display = 'block';
+  $('welcome').innerText = 'Hi, ' + (user.name || user.phone);
+  $('phoneSpan').innerText = 'Phone: ' + user.phone;
+  $('wallet').innerText = user.wallet_balance || 0;
+  if(user.role === 'admin') $('adminPanel').style.display = 'block';
+  refreshHistory();
+}
+
+async function initApp(user){
+  const u = user || JSON.parse(localStorage.getItem('satta_session')).user;
+  if(!u) return;
+  // refresh user info from server
+  try{
+    const res = await fetch(API_URL + '?action=getUser&user_id=' + encodeURIComponent(u.id));
+    const j = await res.json();
+    if(j && j.id){
+      localStorage.setItem('satta_session', JSON.stringify({user:j}));
+      showAppUI(j);
+      return;
+    }
+  }catch(e){}
+  showAppUI(u);
+}
+
+// Logout
+$('btnLogout').addEventListener('click', ()=>{
+  localStorage.removeItem('satta_session');
+  location.reload();
+});
+
+// Add / Withdraw
+$('btnAdd').addEventListener('click', async ()=>{
+  const amt = Number($('txAmount').value);
+  if(!amt || amt<=0){ $('txMsg').innerText = 'Enter valid amount'; return; }
+  const sess = JSON.parse(localStorage.getItem('satta_session'));
+  const r = await callAPI('addMoney',{user_id: sess.user.id, amount: amt, note:'user add'});
+  if(r.success){
+    $('txMsg').innerText = 'Added ₹' + amt;
+    await refreshUser();
+  } else $('txMsg').innerText = 'Error: ' + (r.message||'');
+});
+$('btnWithdraw').addEventListener('click', async ()=>{
+  const amt = Number($('txAmount').value);
+  if(!amt || amt<=0){ $('txMsg').innerText = 'Enter valid amount'; return; }
+  const sess = JSON.parse(localStorage.getItem('satta_session'));
+  const r = await callAPI('withdraw',{user_id: sess.user.id, amount: amt, note:'user withdraw'});
+  if(r.success){
+    $('txMsg').innerText = 'Withdrawn ₹' + amt;
+    await refreshUser();
+  } else $('txMsg').innerText = 'Error: ' + (r.message||'');
+});
+
+// Place bet
+$('btnPlace').addEventListener('click', async ()=>{
+  const market = $('market').value;
+  const number = $('betNumber').value.trim();
+  const amount = Number($('betAmount').value);
+  $('betMsg').innerText = '';
+  if(!market){ $('betMsg').innerText = 'Select market'; return; }
+  if(number === ''){ $('betMsg').innerText = 'Enter number'; return; }
+  if(!amount || amount<=0){ $('betMsg').innerText = 'Enter amount'; return; }
+  const sess = JSON.parse(localStorage.getItem('satta_session'));
+  const r = await callAPI('placeBet',{user_id: sess.user.id, market, number, amount});
+  if(r.success){
+    $('betMsg').innerText = 'Bet placed';
+    await refreshUser();
+    refreshHistory();
+  } else $('betMsg').innerText = 'Error: ' + (r.message||'');
+});
+
+// Refresh history
+$('btnRefresh').addEventListener('click', refreshHistory);
+
+async function refreshUser(){
+  const sess = JSON.parse(localStorage.getItem('satta_session'));
+  const res = await fetch(API_URL + '?action=getUser&user_id=' + encodeURIComponent(sess.user.id));
+  const j = await res.json();
+  if(j && j.id){
+    localStorage.setItem('satta_session', JSON.stringify({user:j}));
+    $('wallet').innerText = j.wallet_balance || 0;
+  }
+  await refreshHistory();
+}
+
+async function refreshHistory(){
+  const sess = JSON.parse(localStorage.getItem('satta_session'));
+  if(!sess) return;
+  const res = await fetch(API_URL + '?action=getHistory&user_id=' + encodeURIComponent(sess.user.id));
+  const j = await res.json();
+  // wallet tx
+  const w = j.wallet || [];
+  $('walletList').innerHTML = w.map(x => `${x.created_at} — ${x.type} ₹${x.amount} → bal ${x.balance_after} (${x.note||''})`).join('<br/>') || 'No transactions';
+  const bets = j.bets || [];
+  $('betsList').innerHTML = bets.map(b => `${b.placed_at} — ${b.market} #${b.number} ₹${b.amount} — ${b.status} ${b.result ? '('+b.result+')' : ''} ${b.payout ? '- payout ₹'+b.payout : ''}`).join('<br/>') || 'No bets';
+  if(sess.user.role === 'admin') loadPendingBets();
+}
+
+// Admin: pending bets
+async function loadPendingBets(){
+  const params = new URLSearchParams({action:'listBets', status:'placed'});
+  const res = await fetch(API_URL + '?' + params.toString());
+  const list = await res.json();
+  const html = (list || []).map(b => {
+    return `<div style="border:1px solid #eee;padding:8px;margin:6px;border-radius:6px">
+      ${b.placed_at} — <strong>${b.market}</strong> #${b.number} ₹${b.amount} by ${b.user_id}<br/>
+      <button onclick="adminApprove('${b.bet_id}', true)">Approve</button>
+      <button onclick="adminApprove('${b.bet_id}', false)">Reject</button>
+    </div>`;
+  }).join('');
+  $('pendingBets').innerHTML = html || 'No pending bets';
+}
+
+window.adminApprove = async function(betId, approve){
+  const sess = JSON.parse(localStorage.getItem('satta_session'));
+  const r = await callAPI('adminApprove',{bet_id: betId, admin_id: sess.user.id, approve});
+  $('adminMsg').innerText = JSON.stringify(r);
+  await refreshHistory();
+};
+
+// Admin create result & settle
+$('btnCreateRes').addEventListener('click', async ()=>{
+  const market = $('resMarket').value;
+  const number = $('resNumber').value.trim();
+  if(!market || number===''){ $('adminMsg').innerText = 'Select market & number'; return; }
+  const sess = JSON.parse(localStorage.getItem('satta_session'));
+  const r = await callAPI('createResult',{admin_id: sess.user.id, market, number});
+  $('adminMsg').innerText = JSON.stringify(r);
+});
+$('btnSettle').addEventListener('click', async ()=>{
+  const market = $('resMarket').value;
+  const number = $('resNumber').value.trim();
+  if(!market || number===''){ $('adminMsg').innerText = 'Select market & number'; return; }
+  const sess = JSON.parse(localStorage.getItem('satta_session'));
+  const r = await callAPI('settleBets',{admin_id: sess.user.id, market, number});
+  $('adminMsg').innerText = JSON.stringify(r);
+  await refreshHistory();
+});
+
+// Auto-login if session exists
+(function init(){
+  const s = localStorage.getItem('satta_session');
+  if(s){
+    const obj = JSON.parse(s);
+    if(obj && obj.user) initApp(obj);
+  }
+})();
+</script>
+</body>
+</html>
